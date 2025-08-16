@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Bell, Palette, Volume2, Shield, CircleHelp as HelpCircle, Star, ChevronRight, User, Moon, Vibrate } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Bell, ChevronRight, CircleHelp as HelpCircle, Moon, Palette, Shield, Star, User, Vibrate, Volume2 } from 'lucide-react-native';
+import React, { useState } from 'react';
+import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 
 interface SettingItem {
   id: string;
@@ -22,36 +22,40 @@ export default function SettingsScreen() {
   const [hapticEnabled, setHapticEnabled] = useState(true);
 
   const handleClearData = () => {
-    Alert.alert(
-      'Clear All Data',
-      'This will permanently delete all your progress, micro-wins, and settings. This action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Clear Data', 
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await AsyncStorage.clear();
-              Alert.alert('Success', 'All data has been cleared.');
-            } catch (error) {
-              Alert.alert('Error', 'Failed to clear data.');
+    if (Platform.OS !== 'web') {
+      Alert.alert(
+        'Clear All Data',
+        'This will permanently delete all your progress, micro-wins, and settings. This action cannot be undone.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Clear Data', 
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await AsyncStorage.clear();
+                Alert.alert('Success', 'All data has been cleared.');
+              } catch (error) {
+                Alert.alert('Error', 'Failed to clear data.');
+              }
             }
           }
-        }
-      ]
-    );
+        ]
+      );
+    }
   };
 
   const handleRateApp = () => {
-    Alert.alert(
-      'Rate Timevate',
-      'Love using Timevate? Please rate us on the App Store to help others discover the power of motivated time management!',
-      [
-        { text: 'Later', style: 'cancel' },
-        { text: 'Rate Now', onPress: () => console.log('Navigate to app store') }
-      ]
-    );
+    if (Platform.OS !== 'web') {
+      Alert.alert(
+        'Rate Timevate',
+        'Love using Timevate? Please rate us on the App Store to help others discover the power of motivated time management!',
+        [
+          { text: 'Later', style: 'cancel' },
+          { text: 'Rate Now', onPress: () => console.log('Navigate to app store') }
+        ]
+      );
+    }
   };
 
   const settingSections = [
@@ -193,7 +197,7 @@ export default function SettingsScreen() {
     >
       <View style={styles.header}>
         <Text style={styles.title}>Settings</Text>
-        <Text style={styles.subtitle}>Customize your Motivox experience</Text>
+        <Text style={styles.subtitle}>Customize your Timevate experience</Text>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>

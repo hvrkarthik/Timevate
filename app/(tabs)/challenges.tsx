@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Platform } from 'react-native';
 import { Timer, CircleCheck as CheckCircle, Play, Pause } from 'lucide-react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { useTimeTracking } from '@/providers/TimeTrackingProvider';
@@ -68,11 +69,15 @@ export default function ChallengesScreen() {
         category: activeChallenge.category,
       });
       
-      Alert.alert(
-        '🎉 Challenge Complete!',
-        `Great job completing "${activeChallenge.title}"! Every second counts!`,
-        [{ text: 'Awesome!', onPress: handleReset }]
-      );
+      if (Platform.OS !== 'web') {
+        Alert.alert(
+          '🎉 Challenge Complete!',
+          `Great job completing "${activeChallenge.title}"! Every second counts!`,
+          [{ text: 'Awesome!', onPress: handleReset }]
+        );
+      } else {
+        handleReset();
+      }
     }
   };
 

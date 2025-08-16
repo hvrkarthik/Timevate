@@ -1,14 +1,23 @@
 import React, { createContext, useContext, useEffect, ReactNode } from 'react';
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+let Notifications: any = null;
+
+// Dynamically import notifications only on supported platforms
+if (Platform.OS !== 'web') {
+  try {
+    Notifications = require('expo-notifications');
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+      }),
+    });
+  } catch (error) {
+    console.warn('Notifications not available:', error);
+  }
+}
 
 interface NotificationContextType {
   scheduleHourlyReminder: () => Promise<void>;
@@ -24,7 +33,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setupNotifications = async () => {
-    if (Platform.OS !== 'web') {
+    if (Platform.OS !== 'web' && Notifications) {
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
       let finalStatus = existingStatus;
       
@@ -41,6 +50,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   };
 
   const scheduleHourlyReminder = async () => {
+    if (!Notifications) return;
+    
     try {
       await Notifications.scheduleNotificationAsync({
         content: {
@@ -59,6 +70,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   };
 
   const scheduleMicroGoalReminder = async (title: string, body: string, seconds: number) => {
+    if (!Notifications) return;
+    
     try {
       await Notifications.scheduleNotificationAsync({
         content: {
@@ -76,6 +89,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   };
 
   const cancelAllNotifications = async () => {
+    if (!Notifications) return;
+    
     try {
       await Notifications.cancelAllScheduledNotificationsAsync();
     } catch (error) {

@@ -3,7 +3,7 @@ import { useTimeTracking } from '@/providers/TimeTrackingProvider';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Pause, Play, RotateCcw } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -101,47 +101,47 @@ export default function HomeScreen() {
             <Text style={styles.tagline}>Every Second Counts</Text>
           </View>
 
-          <Animated.View style={[styles.clockContainer, pulseStyle]}>
-            <View style={styles.clockInner}>
-              <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
-              
-              {isActive && (
-                <Animated.View style={[styles.motivationContainer, fadeStyle]}>
-                  <Text style={styles.motivationText}>
-                    {motivationalWords[currentWordIndex]}
-                  </Text>
-                </Animated.View>
-              )}
-            </View>
-          </Animated.View>
-
-          <View style={styles.statusContainer}>
-            <Text style={styles.statusText}>
-              {isActive ? '🔥 Motivation Mode Active' : '⏸️ Ready to Start'}
-            </Text>
+        <Animated.View style={[styles.clockContainer, pulseStyle]}>
+          <View style={styles.clockInner}>
+            <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
+            
+            {isActive && (
+              <Animated.View style={[styles.motivationContainer, fadeStyle]}>
+                <Text style={styles.motivationText}>
+                  {motivationalWords[currentWordIndex]}
+                </Text>
+              </Animated.View>
+            )}
           </View>
+        </Animated.View>
 
-          <View style={styles.controlsContainer}>
-            <TouchableOpacity
-              style={[styles.controlButton, styles.resetButton]}
-              onPress={handleReset}
-            >
-              <RotateCcw size={24} color="#FFFFFF" strokeWidth={2} />
-            </TouchableOpacity>
+        <View style={styles.statusContainer}>
+          <Text style={styles.statusText}>
+            {isActive ? '🔥 Motivation Mode Active' : '⏸️ Ready to Start'}
+          </Text>
+        </View>
 
-            <TouchableOpacity
-              style={[styles.controlButton, styles.playButton, isActive && styles.pauseButton]}
-              onPress={handleToggle}
-            >
-              {isActive ? (
-                <Pause size={32} color="#FFFFFF" strokeWidth={2} />
-              ) : (
-                <Play size={32} color="#FFFFFF" strokeWidth={2} />
-              )}
-            </TouchableOpacity>
+        <View style={styles.controlsContainer}>
+          <TouchableOpacity
+            style={[styles.controlButton, styles.resetButton]}
+            onPress={handleReset}
+          >
+            <RotateCcw size={24} color="#FFFFFF" strokeWidth={2} />
+          </TouchableOpacity>
 
-            <View style={styles.placeholder} />
-          </View>
+          <TouchableOpacity
+            style={[styles.controlButton, styles.playButton, isActive && styles.pauseButton]}
+            onPress={handleToggle}
+          >
+            {isActive ? (
+              <Pause size={32} color="#FFFFFF" strokeWidth={2} />
+            ) : (
+              <Play size={32} color="#FFFFFF" strokeWidth={2} />
+            )}
+          </TouchableOpacity>
+
+          <View style={styles.placeholder} />
+        </View>
 
           <View style={styles.quickStatsContainer}>
             <View style={styles.statCard}>
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 40,
   },
   appTitle: {
     fontSize: 32,

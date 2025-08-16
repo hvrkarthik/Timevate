@@ -103,11 +103,10 @@ export function TimeTrackingProvider({ children }: { children: ReactNode }) {
 
   const saveData = async () => {
     try {
-      await Promise.all([
-        AsyncStorage.setItem(STORAGE_KEYS.TIME_DATA, JSON.stringify(timeData)),
-        AsyncStorage.setItem(STORAGE_KEYS.MICRO_WINS, JSON.stringify(microWins)),
-        AsyncStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(currentSession)),
-      ]);
+      // Save data sequentially to avoid race conditions
+      await AsyncStorage.setItem(STORAGE_KEYS.TIME_DATA, JSON.stringify(timeData));
+      await AsyncStorage.setItem(STORAGE_KEYS.MICRO_WINS, JSON.stringify(microWins));
+      await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(currentSession));
     } catch (error) {
       console.error('Error saving data:', error);
     }
