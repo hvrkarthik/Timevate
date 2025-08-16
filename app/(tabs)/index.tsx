@@ -1,75 +1,303 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { motivationalWords } from '@/constants/motivationalWords';
+import { useTimeTracking } from '@/providers/TimeTrackingProvider';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Pause, Play, RotateCcw } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
+import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming
+} from 'react-native-reanimated';
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+const { width, height } = Dimensions.get('window');
 
 export default function HomeScreen() {
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [isActive, setIsActive] = useState(false);
+  const [currentWordIndex, setCurrentWordIndex] = useState(0);
+  const { startSession, stopSession } = useTimeTracking();
+  
+  const pulseAnim = useSharedValue(1);
+  const fadeAnim = useSharedValue(1);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+      if (isActive) {
+        setCurrentWordIndex(prev => (prev + 1) % motivationalWords.length);
+        
+        // Pulse animation for the motivational word
+        fadeAnim.value = withSequence(
+          withTiming(0.7, { duration: 100 }),
+          withTiming(1, { duration: 100 })
+        );
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [isActive]);
+
+  useEffect(() => {
+    if (isActive) {
+      pulseAnim.value = withTiming(1.05, {
+        duration: 1000,
+        easing: Easing.inOut(Easing.ease),
+      });
+      setTimeout(() => {
+        pulseAnim.value = withTiming(1, {
+          duration: 1000,
+          easing: Easing.inOut(Easing.ease),
+        });
+      }, 1000);
+    }
+  }, [currentTime, isActive]);
+
+  const handleToggle = () => {
+    if (isActive) {
+      stopSession();
+    } else {
+      startSession();
+    }
+    setIsActive(!isActive);
+  };
+
+  const handleReset = () => {
+    setIsActive(false);
+    stopSession();
+    setCurrentWordIndex(0);
+  };
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString([], { 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      second: '2-digit' 
+    });
+  };
+
+  const pulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulseAnim.value }],
+  }));
+
+  const fadeStyle = useAnimatedStyle(() => ({
+    opacity: fadeAnim.value,
+  }));
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <LinearGradient
+      colors={['#FF6B35', '#F7931E', '#FFB347']}
+      style={styles.container}
+    >
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.content}>
+          <View style={styles.header}>
+            <Text style={styles.appTitle}>Timevate</Text>
+            <Text style={styles.tagline}>Every Second Counts</Text>
+          </View>
+
+          <Animated.View style={[styles.clockContainer, pulseStyle]}>
+            <View style={styles.clockInner}>
+              <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
+              
+              {isActive && (
+                <Animated.View style={[styles.motivationContainer, fadeStyle]}>
+                  <Text style={styles.motivationText}>
+                    {motivationalWords[currentWordIndex]}
+                  </Text>
+                </Animated.View>
+              )}
+            </View>
+          </Animated.View>
+
+          <View style={styles.statusContainer}>
+            <Text style={styles.statusText}>
+              {isActive ? '🔥 Motivation Mode Active' : '⏸️ Ready to Start'}
+            </Text>
+          </View>
+
+          <View style={styles.controlsContainer}>
+            <TouchableOpacity
+              style={[styles.controlButton, styles.resetButton]}
+              onPress={handleReset}
+            >
+              <RotateCcw size={24} color="#FFFFFF" strokeWidth={2} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.controlButton, styles.playButton, isActive && styles.pauseButton]}
+              onPress={handleToggle}
+            >
+              {isActive ? (
+                <Pause size={32} color="#FFFFFF" strokeWidth={2} />
+              ) : (
+                <Play size={32} color="#FFFFFF" strokeWidth={2} />
+              )}
+            </TouchableOpacity>
+
+            <View style={styles.placeholder} />
+          </View>
+
+          <View style={styles.quickStatsContainer}>
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>24</Text>
+              <Text style={styles.statLabel}>Hours Today</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>86,400</Text>
+              <Text style={styles.statLabel}>Seconds to Use</Text>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
   },
-  stepContainer: {
-    gap: 8,
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 40, // Ensure content is not cut off at the bottom
+  },
+  content: {
+    flex: 1,
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  appTitle: {
+    fontSize: 32,
+    fontFamily: 'Inter-Bold',
+    color: '#FFFFFF',
     marginBottom: 8,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
+  tagline: {
+    fontSize: 16,
+    fontFamily: 'Inter-Medium',
+    color: '#FFFFFF',
+    opacity: 0.9,
+  },
+  clockContainer: {
+    width: width * 0.8,
+    height: width * 0.8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  clockInner: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: width * 0.4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 4,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  timeText: {
+    fontSize: 42,
+    fontFamily: 'Inter-Bold',
+    color: '#FFFFFF',
+    textAlign: 'center',
+  },
+  motivationContainer: {
     position: 'absolute',
+    bottom: 60,
+    paddingHorizontal: 20,
+  },
+  motivationText: {
+    fontSize: 18,
+    fontFamily: 'Inter-SemiBold',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  statusContainer: {
+    marginBottom: 20,
+  },
+  statusText: {
+    fontSize: 16,
+    fontFamily: 'Inter-Medium',
+    color: '#FFFFFF',
+    opacity: 0.9,
+  },
+  controlsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: width * 0.7,
+    marginBottom: 30,
+  },
+  controlButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  resetButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  playButton: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  pauseButton: {
+    backgroundColor: 'rgba(255, 107, 53, 0.8)',
+  },
+  placeholder: {
+    width: 50,
+    height: 50,
+  },
+  quickStatsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingHorizontal: 10,
+    marginBottom: 20,
+  },
+  statCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    flex: 1,
+    marginHorizontal: 8,
+    minHeight: 80,
+  },
+  statNumber: {
+    fontSize: 28,
+    fontFamily: 'Inter-Bold',
+    color: '#FFFFFF',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  statLabel: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    color: '#FFFFFF',
+    opacity: 0.8,
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });
