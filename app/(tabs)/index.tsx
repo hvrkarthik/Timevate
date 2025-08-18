@@ -1,89 +1,142 @@
-import { motivationalWords } from '@/constants/motivationalWords';
-import { useTimeTracking } from '@/providers/TimeTrackingProvider';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState, AppStateStatus, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withSequence, withTiming, cancelAnimation } from 'react-native-reanimated';
 import { Pause, Play, RotateCcw } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
-import { Dimensions, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withSequence,
-  withTiming
-} from 'react-native-reanimated';
 
-const { width, height } = Dimensions.get('window');
+import { motivationalWords as MOTIVATION_SOURCE } from '@/constants/motivationalWords';
+import { useTimeTracking } from '@/providers/TimeTrackingProvider';
 
+// ------ Types ------
+type MaybePromise = void | Promise<void>;
+
+// ------ Component ------
 export default function HomeScreen() {
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const [isActive, setIsActive] = useState(false);
-  const [currentWordIndex, setCurrentWordIndex] = useState(0);
-  const { startSession, stopSession } = useTimeTracking();
-  
-  const pulseAnim = useSharedValue(1);
-  const fadeAnim = useSharedValue(1);
+  // Responsive sizing
+  const { width } = useWindowDimensions();
+  const circleSize = Math.min(width * 0.8, 420);
+  const circleRadius = circleSize / 2;
 
+  // Time + session state
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+  const [isActive, setIsActive] = useState(false);
+  const [appState, setAppState] = useState<AppStateStatus>('active');
+
+  // Defensive: ensure we always have at least one word to show
+  const words = useMemo<string[]>(
+    () => Array.isArray(MOTIVATION_SOURCE) && MOTIVATION_SOURCE.length > 0
+      ? MOTIVATION_SOURCE
+      : ['Keep going', 'You’ve got this', 'Stay focused', 'Small steps add up'],
+    []
+  );
+  const [currentWordIndex, setCurrentWordIndex] = useState(0);
+
+  // Provider
+  const { startSession, stopSession } = useTimeTracking();
+
+  // Animations
+  const pulse = useSharedValue(1);
+  const fade = useSharedValue(1);
+
+  const tickerRef = useRef<NodeJS.Timer | null>(null);
+
+  // AppState handling — pause timers in background (good for Play policies and battery)
   useEffect(() => {
-    const timer = setInterval(() => {
+    const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
+      setAppState(next);
+    });
+    return () => sub.remove();
+  }, []);
+
+  // 1-second ticker that only runs when active AND app is foregrounded
+  useEffect(() => {
+    // Clear any existing
+    if (tickerRef.current) {
+      clearInterval(tickerRef.current);
+      tickerRef.current = null;
+    }
+
+    const shouldRun = isActive && appState === 'active';
+    if (!shouldRun) return; // not running in background or when inactive
+
+    tickerRef.current = setInterval(() => {
       setCurrentTime(new Date());
-      if (isActive) {
-        setCurrentWordIndex(prev => (prev + 1) % motivationalWords.length);
-        
-        // Pulse animation for the motivational word
-        fadeAnim.value = withSequence(
-          withTiming(0.7, { duration: 100 }),
-          withTiming(1, { duration: 100 })
-        );
-      }
+
+      // advance word index safely
+      setCurrentWordIndex((prev) => (prev + 1) % words.length);
+
+      // fade "pulse" on the word
+      fade.value = withSequence(
+        withTiming(0.7, { duration: 120 }),
+        withTiming(1, { duration: 120 })
+      );
+
+      // soft pulse on the clock
+      cancelAnimation(pulse);
+      pulse.value = withSequence(
+        withTiming(1.05, { duration: 240, easing: Easing.inOut(Easing.ease) }),
+        withTiming(1, { duration: 240, easing: Easing.inOut(Easing.ease) })
+      );
     }, 1000);
 
-    return () => clearInterval(timer);
-  }, [isActive]);
+    return () => {
+      if (tickerRef.current) {
+        clearInterval(tickerRef.current);
+        tickerRef.current = null;
+      }
+    };
+  }, [isActive, appState, words.length, fade, pulse]);
 
+  // Cleanup animations on unmount just in case
   useEffect(() => {
-    if (isActive) {
-      pulseAnim.value = withTiming(1.05, {
-        duration: 1000,
-        easing: Easing.inOut(Easing.ease),
-      });
-      setTimeout(() => {
-        pulseAnim.value = withTiming(1, {
-          duration: 1000,
-          easing: Easing.inOut(Easing.ease),
-        });
-      }, 1000);
+    return () => {
+      cancelAnimation(pulse);
+      cancelAnimation(fade);
+      if (tickerRef.current) clearInterval(tickerRef.current);
+    };
+  }, [pulse, fade]);
+
+  // Actions
+  const handleToggle = useCallback(async () => {
+    try {
+      const action: MaybePromise = isActive ? stopSession() : startSession();
+      await action;
+      setIsActive((v) => !v);
+    } catch (e) {
+      // Don’t crash the app on release if provider throws
+      console.warn('[Timevate] Session toggle failed:', e);
     }
-  }, [currentTime, isActive]);
+  }, [isActive, startSession, stopSession]);
 
-  const handleToggle = () => {
-    if (isActive) {
-      stopSession();
-    } else {
-      startSession();
+  const handleReset = useCallback(async () => {
+    try {
+      if (isActive) {
+        await stopSession();
+      }
+    } catch (e) {
+      console.warn('[Timevate] Stop session failed on reset:', e);
+    } finally {
+      setIsActive(false);
+      setCurrentWordIndex(0);
+      // reset animations to baseline
+      cancelAnimation(pulse);
+      cancelAnimation(fade);
+      pulse.value = 1;
+      fade.value = 1;
     }
-    setIsActive(!isActive);
-  };
+  }, [isActive, stopSession, pulse, fade]);
 
-  const handleReset = () => {
-    setIsActive(false);
-    stopSession();
-    setCurrentWordIndex(0);
-  };
+  // Helpers
+  const formatTime = (date: Date) =>
+    date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString([], { 
-      hour: '2-digit', 
-      minute: '2-digit', 
-      second: '2-digit' 
-    });
-  };
-
+  // Animated styles
   const pulseStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pulseAnim.value }],
+    transform: [{ scale: pulse.value }],
   }));
 
   const fadeStyle = useAnimatedStyle(() => ({
-    opacity: fadeAnim.value,
+    opacity: fade.value,
   }));
 
   return (
@@ -94,6 +147,8 @@ export default function HomeScreen() {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        // Ensure scroll is stable even with large fonts
+        keyboardShouldPersistTaps="handled"
       >
         <View style={styles.content}>
           <View style={styles.header}>
@@ -101,47 +156,56 @@ export default function HomeScreen() {
             <Text style={styles.tagline}>Every Second Counts</Text>
           </View>
 
-        <Animated.View style={[styles.clockContainer, pulseStyle]}>
-          <View style={styles.clockInner}>
-            <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
-            
-            {isActive && (
-              <Animated.View style={[styles.motivationContainer, fadeStyle]}>
-                <Text style={styles.motivationText}>
-                  {motivationalWords[currentWordIndex]}
-                </Text>
-              </Animated.View>
-            )}
+          <Animated.View style={[styles.clockContainer, { width: circleSize, height: circleSize }, pulseStyle]}>
+            <View style={[
+              styles.clockInner,
+              {
+                borderRadius: circleRadius,
+              }
+            ]}>
+              <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
+
+              {isActive ? (
+                <Animated.View style={[styles.motivationContainer, fadeStyle]}>
+                  <Text style={styles.motivationText} numberOfLines={2}>
+                    {words[currentWordIndex] ?? words[0]}
+                  </Text>
+                </Animated.View>
+              ) : null}
+            </View>
+          </Animated.View>
+
+          <View style={styles.statusContainer}>
+            <Text style={styles.statusText}>
+              {isActive ? '🔥 Motivation Mode Active' : '⏸️ Ready to Start'}
+            </Text>
           </View>
-        </Animated.View>
 
-        <View style={styles.statusContainer}>
-          <Text style={styles.statusText}>
-            {isActive ? '🔥 Motivation Mode Active' : '⏸️ Ready to Start'}
-          </Text>
-        </View>
+          <View style={[styles.controlsContainer, { width: Math.min(width * 0.7, 420) }]}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Reset session"
+              style={[styles.controlButton, styles.resetButton]}
+              onPress={handleReset}
+            >
+              <RotateCcw size={24} color="#FFFFFF" strokeWidth={2} />
+            </TouchableOpacity>
 
-        <View style={styles.controlsContainer}>
-          <TouchableOpacity
-            style={[styles.controlButton, styles.resetButton]}
-            onPress={handleReset}
-          >
-            <RotateCcw size={24} color="#FFFFFF" strokeWidth={2} />
-          </TouchableOpacity>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={isActive ? 'Pause session' : 'Start session'}
+              style={[styles.controlButton, styles.playButton, isActive && styles.pauseButton]}
+              onPress={handleToggle}
+            >
+              {isActive ? (
+                <Pause size={32} color="#FFFFFF" strokeWidth={2} />
+              ) : (
+                <Play size={32} color="#FFFFFF" strokeWidth={2} />
+              )}
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.controlButton, styles.playButton, isActive && styles.pauseButton]}
-            onPress={handleToggle}
-          >
-            {isActive ? (
-              <Pause size={32} color="#FFFFFF" strokeWidth={2} />
-            ) : (
-              <Play size={32} color="#FFFFFF" strokeWidth={2} />
-            )}
-          </TouchableOpacity>
-
-          <View style={styles.placeholder} />
-        </View>
+            <View style={styles.placeholder} />
+          </View>
 
           <View style={styles.quickStatsContainer}>
             <View style={styles.statCard}>
@@ -159,13 +223,14 @@ export default function HomeScreen() {
   );
 }
 
+// ------ Styles ------
 const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: 40, // Ensure content is not cut off at the bottom
+    paddingBottom: 40,
   },
   content: {
     flex: 1,
@@ -179,6 +244,7 @@ const styles = StyleSheet.create({
   },
   appTitle: {
     fontSize: 32,
+    // If custom fonts are not loaded, fall back to system font gracefully
     fontFamily: 'Inter-Bold',
     color: '#FFFFFF',
     marginBottom: 8,
@@ -190,8 +256,6 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   clockContainer: {
-    width: width * 0.8,
-    height: width * 0.8,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 30,
@@ -200,7 +264,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: width * 0.4,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 4,
@@ -239,7 +302,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    width: width * 0.7,
     marginBottom: 30,
   },
   controlButton: {
