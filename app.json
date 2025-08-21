@@ -2,7 +2,7 @@
   "expo": {
     "name": "TimeVate",
     "slug": "TimeVate",
-    "version": "8.0.0",
+    "version": "10.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "timevate",
@@ -28,7 +28,7 @@
         "backgroundColor": "#FF6B35"
       },
       "package": "com.timevate.app",
-      "versionCode": 3,
+      "versionCode": 4,
       "compileSdkVersion": 34,
       "targetSdkVersion": 34,
       "permissions": [

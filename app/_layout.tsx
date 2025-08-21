@@ -50,7 +50,7 @@ export default function RootLayout() {
           <Stack.Screen name="onboarding" />
           <Stack.Screen name="+not-found" />
         </Stack>
-        <StatusBar style="light" backgroundColor="#FF6B35" />
+       <StatusBar style="light" translucent backgroundColor="transparent" />
       </NotificationProvider>
     </TimeTrackingProvider>
   );
